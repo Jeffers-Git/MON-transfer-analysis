@@ -1,0 +1,41 @@
+WITH total_mon AS (
+    SELECT SUM(t.value) AS grand_total_mon
+    FROM monad.testnet.fact_transactions t
+    LEFT JOIN monad.testnet.dim_contracts c 
+      ON t.to_address = c.address  -- Check if receiver is a smart contract
+    WHERE value > 0 
+    AND t.block_timestamp >= '2025-02-19 15:00' 
+    AND t.tx_succeeded = TRUE
+    AND c.address IS NULL  -- Only keep EOAs (not in dim_contracts)
+    AND t.from_address != t.to_address -- Exclude self-transfers
+),
+main_query as (
+  select 
+  t.from_address AS account, 
+  ROUND(SUM(t.value), 2) AS total_mon_sent, 
+  COUNT(*) AS total_transactions,
+  ROUND((SUM(t.value) / total_mon.grand_total_mon) * 100, 2) || '%' AS percentage_of_total_mon
+  from monad.testnet.fact_transactions t
+  LEFT JOIN monad.testnet.dim_contracts c 
+      ON t.to_address = c.address  -- Check if receiver is a smart contract
+  JOIN total_mon  -- Join the total MON sent across all accounts
+  where t.value > 0 and t.block_timestamp >= '2025-02-19 15:00' and t.tx_succeeded = 'TRUE'
+  AND c.address IS NULL  -- Only keep EOAs (not in dim_contracts)
+  AND t.from_address != t.to_address -- Exclude self-transfers
+  group by t.from_address, total_mon.grand_total_mon
+  having count(*) > 100
+  ORDER BY total_mon_sent DESC
+  limit 10 
+)
+
+SELECT * FROM main_query
+UNION ALL
+SELECT 
+    'TOTAL' AS account, 
+    ROUND(SUM(total_mon_sent), 2) AS total_mon_sent, 
+    SUM(total_transactions) AS total_transactions,
+    ROUND((SUM(total_mon_sent) / (SELECT grand_total_mon FROM total_mon)) * 100, 2) || '%' AS percentage_of_total_mon
+FROM main_query
+ORDER BY 
+    CASE WHEN account = 'TOTAL' THEN 1 ELSE 0 END, 
+    total_mon_sent DESC;
