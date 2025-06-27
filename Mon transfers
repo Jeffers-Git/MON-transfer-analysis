@@ -1,0 +1,12 @@
+select 
+DATE(t.block_timestamp) AS transfer_date, 
+COUNT(*) AS total_transfers, 
+round(SUM(t.value), 2) AS total_value
+from monad.testnet.fact_transactions t
+LEFT JOIN monad.testnet.dim_contracts c 
+  on t.to_address = c.address -- Check if receiver is a smart contract
+where t.value > 0 and t.block_timestamp >= '2025-02-19 15:00' and t.tx_succeeded = 'TRUE'
+AND c.address IS NULL  -- Only include transfers to EOAs
+AND t.from_address != t.to_address -- Exclude self-transfers
+group by transfer_date
+ORDER BY transfer_date ASC;
