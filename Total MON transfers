@@ -1,0 +1,9 @@
+SELECT COUNT(*) AS grand_total_transfers
+FROM monad.testnet.fact_transactions t
+LEFT JOIN monad.testnet.dim_contracts c 
+  ON t.to_address = c.address  -- Check if receiver is a smart contract
+WHERE value > 0 
+AND t.block_timestamp :: date >= '2025-02-19 15:00' 
+AND t.tx_succeeded = 'TRUE'
+AND c.address IS NULL  -- Only keep EOAs (not in dim_contracts)
+AND t.from_address != t.to_address -- Exclude self-transfers
