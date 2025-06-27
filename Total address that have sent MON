@@ -1,0 +1,10 @@
+SELECT COUNT(DISTINCT t.from_address) AS total_addresses_sent_mon
+FROM monad.testnet.fact_transactions t
+LEFT JOIN monad.testnet.dim_contracts c 
+    ON t.from_address = c.address  -- Check if sender is a smart contract
+WHERE t.value > 0 
+AND t.block_timestamp >= '2025-02-19 15:00' 
+AND t.tx_succeeded = 'TRUE'
+AND c.address IS NULL  -- Only keep EOAs (exclude smart contracts)
+AND t.from_address IS NOT NULL
+AND t.from_address != t.to_address;  -- Exclude self-transfers
